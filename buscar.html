@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buscar en Archivos</title>
+    <style>
+        /* Fuente personalizada */
+        @font-face {
+            font-family: 'AmericanTypewriter';
+            src: url('static/american-typewriter.ttf') format('truetype');
+        }
+
+        body {
+            background-color: white; /* Fondo blanco */
+            font-family: 'AmericanTypewriter', sans-serif; /* Fuente personalizada */
+            text-align: center;
+            padding: 50px;
+            position: relative;
+        }
+
+        h1 {
+            font-size: 36px;
+            color: #004d00;
+        }
+
+        .button {
+            display: inline-block;
+            padding: 15px 30px;
+            font-size: 18px;
+            background-color: #004d00;
+            color: white;
+            border: 2px solid #004d00;
+            border-radius: 10px;
+            cursor: pointer;
+            text-decoration: none;
+            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+            font-family: 'AmericanTypewriter', sans-serif;
+        }
+
+        .button:hover {
+            background-color: white;
+            color: #004d00;
+            box-shadow: 4px 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .file-input {
+            display: none; /* Ocultar el input de archivo */
+        }
+
+        #results {
+            margin-top: 30px;
+            font-size: 18px;
+            color: #004d00;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        table, th, td {
+            border: 1px solid #004d00;
+        }
+
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #004d00;
+            color: white;
+        }
+
+        td {
+            color: green; /* Texto verde */
+        }
+
+        /* Estilo para la imagen en la esquina superior izquierda */
+        #logo {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 200px; /* Tamaño más grande */
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+    <!-- Imagen en la esquina superior izquierda -->
+    <img id="logo" src="static/3.png" alt="Logo">
+
+    <h1>Buscar en Archivos</h1>
+
+    <!-- Formulario para ingresar palabras a buscar y seleccionar carpeta -->
+    <form id="searchForm">
+        <input type="text" id="searchText" placeholder="Texto a buscar (separado por comas)" style="width: 300px;" required><br><br>
+
+        <!-- Botón para seleccionar la carpeta -->
+        <button type="button" class="button" id="selectFolderBtn">Seleccionar Carpeta</button>
+        <input type="file" id="folderInput" class="file-input" webkitdirectory directory required><br><br>
+
+        <!-- Botón para añadir un archivo TXT -->
+        <button type="button" class="button" id="addTxtBtn">Añadir TXT</button>
+        <input type="file" id="txtInput" class="file-input" accept=".txt"><br><br>
+
+        <button type="submit" class="button">Buscar</button>
+    </form>
+
+    <!-- Tabla de resultados -->
+    <div id="results">
+        <table id="resultsTable">
+            <thead>
+                <tr>
+                    <th>Ruta del Archivo</th>
+                    <th>Palabra Encontrada</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Los resultados se agregarán aquí dinámicamente -->
+            </tbody>
+        </table>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.14.305/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.2/mammoth.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.5/xlsx.full.min.js"></script>
+
+    <script>
+        // Mostrar el input de carpeta al hacer clic en el botón
+        document.getElementById('selectFolderBtn').addEventListener('click', function() {
+            document.getElementById('folderInput').click();
+        });
+
+        // Mostrar el input para añadir el archivo TXT
+        document.getElementById('addTxtBtn').addEventListener('click', function() {
+            document.getElementById('txtInput').click();
+        });
+
+        // Manejar el envío del formulario
+        document.getElementById("searchForm").addEventListener("submit", function(event) {
+            event.preventDefault(); // Prevenir el comportamiento por defecto del formulario
+            let searchText = document.getElementById("searchText").value;
+            let folderInput = document.getElementById("folderInput");
+
+            if (!searchText || folderInput.files.length === 0) {
+                alert("Por favor, ingresa palabras y selecciona una carpeta.");
+                return;
+            }
+
+            let searchWords = searchText.split(",").map(word => word.trim().toLowerCase()); // Dividir las palabras por coma
+            let folder = folderInput.files[0].webkitRelativePath.split("/")[0]; // Tomar la ruta de la carpeta seleccionada
+
+            // Aquí iría la lógica para buscar en los archivos
+            searchInFiles(folder, searchWords);
+        });
+
+        // Función para añadir palabras desde el archivo TXT
+        document.getElementById('txtInput').addEventListener('change', function(event) {
+            let file = event.target.files[0];
+            if (file) {
+                let reader = new FileReader();
+                reader.onload = function(e) {
+                    let content = e.target.result;
+                    // Añadir el contenido del archivo al campo de texto
+                    let searchText = document.getElementById('searchText');
+                    searchText.value += (searchText.value ? ', ' : '') + content.trim();
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        function searchInFiles(folder, searchWords) {
+            let results = []; // Array para almacenar los resultados encontrados
+
+            let files = document.getElementById("folderInput").files;
+            for (let file of files) {
+                let fileName = file.name.toLowerCase();
+                let filePath = file.webkitRelativePath;
+
+                let foundWords = searchWords.filter(word => fileName.includes(word));
+                if (foundWords.length > 0) {
+                    // Si se encuentra alguna palabra en el nombre del archivo
+                    results.push({ filePath, foundWords });
+                }
+
+                // Ahora buscar dentro del contenido de los archivos
+                if (fileName.endsWith(".txt")) {
+                    readTextFile(file, searchWords, results);
+                } else if (fileName.endsWith(".json")) {
+                    readJsonFile(file, searchWords, results);
+                } else if (fileName.endsWith(".pdf")) {
+                    readPdfFile(file, searchWords, results);
+                } else if (fileName.endsWith(".docx")) {
+                    readWordFile(file, searchWords, results);
+                } else if (fileName.endsWith(".xlsx")) {
+                    readExcelFile(file, searchWords, results);
+                }
+            }
+
+            setTimeout(function() {
+                displayResults(results);
+            }, 1000); // Espera un segundo para mostrar los resultados
+        }
+
+        // Funciones para leer y buscar en los diferentes tipos de archivo
+
+        function readTextFile(file, searchWords, results) {
+            let reader = new FileReader();
+            reader.onload = function() {
+                let content = reader.result.toLowerCase();
+                let foundWords = searchWords.filter(word => content.includes(word));
+                if (foundWords.length > 0) {
+                    results.push({ filePath: file.name, foundWords });
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function readJsonFile(file, searchWords, results) {
+            let reader = new FileReader();
+            reader.onload = function() {
+                try {
+                    let json = JSON.parse(reader.result);
+                    let content = JSON.stringify(json).toLowerCase();
+                    let foundWords = searchWords.filter(word => content.includes(word));
+                    if (foundWords.length > 0) {
+                        results.push({ filePath: file.name, foundWords });
+                    }
+                } catch (e) {
+                    console.error("Error al leer JSON:", e);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function readPdfFile(file, searchWords, results) {
+            let reader = new FileReader();
+            reader.onload = function() {
+                let pdfData = new Uint8Array(reader.result);
+                pdfjsLib.getDocument(pdfData).promise.then(function(pdf) {
+                    let pagePromises = [];
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        pagePromises.push(pdf.getPage(i).then(function(page) {
+                            page.getTextContent().then(function(textContent) {
+                                let text = textContent.items.map(item => item.str).join(" ").toLowerCase();
+                                let foundWords = searchWords.filter(word => text.includes(word));
+                                if (foundWords.length > 0) {
+                                    results.push({ filePath: file.name, foundWords });
+                                }
+                            });
+                        }));
+                    }
+                    Promise.all(pagePromises);
+                });
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function readWordFile(file, searchWords, results) {
+            let reader = new FileReader();
+            reader.onload = function() {
+                mammoth.extractRawText({ arrayBuffer: reader.result })
+                    .then(function(result) {
+                        let text = result.value.toLowerCase();
+                        let foundWords = searchWords.filter(word => text.includes(word));
+                        if (foundWords.length > 0) {
+                            results.push({ filePath: file.name, foundWords });
+                        }
+                    })
+                    .catch(function(err) {
+                        console.error("Error al leer Word:", err);
+                    });
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function readExcelFile(file, searchWords, results) {
+            let reader = new FileReader();
+            reader.onload = function() {
+                let data = new Uint8Array(reader.result);
+                let workbook = XLSX.read(data, { type: "array" });
+                workbook.SheetNames.forEach(function(sheetName) {
+                    let sheet = workbook.Sheets[sheetName];
+                    let content = XLSX.utils.sheet_to_text(sheet).toLowerCase();
+                    let foundWords = searchWords.filter(word => content.includes(word));
+                    if (foundWords.length > 0) {
+                        results.push({ filePath: file.name, foundWords });
+                    }
+                });
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Mostrar los resultados en una tabla
+        function displayResults(results) {
+            let resultsTable = document.getElementById("resultsTable").getElementsByTagName("tbody")[0];
+            resultsTable.innerHTML = ""; // Limpiar la tabla antes de mostrar nuevos resultados
+
+            let uniqueResults = [];
+            results.forEach(result => {
+                let exists = uniqueResults.some(r => r.filePath === result.filePath);
+                if (!exists) {
+                    uniqueResults.push(result);
+                }
+            });
+
+            if (uniqueResults.length === 0) {
+                resultsTable.innerHTML = "<tr><td colspan='2'>No se encontraron resultados.</td></tr>";
+            } else {
+                uniqueResults.forEach(result => {
+                    let row = resultsTable.insertRow();
+                    let cell1 = row.insertCell(0);
+                    let cell2 = row.insertCell(1);
+
+                    // Crear un enlace para la ruta del archivo
+                    let link = document.createElement("a");
+                    link.href = result.filePath; // Usar la ruta del archivo
+                    link.textContent = result.filePath; // Mostrar el nombre del archivo
+                    link.target = "_blank";  // Abrir el archivo en nueva pestaña
+                    cell1.appendChild(link);
+
+                    cell2.textContent = result.foundWords.join(", ");
+                });
+            }
+        }
+    </script>
+</body>
+</html>

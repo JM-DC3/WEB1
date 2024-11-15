@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cuadrante</title>
+    <style>
+        /* Fuente personalizada */
+        @font-face {
+            font-family: 'AmericanTypewriter';
+            src: url('static/american-typewriter.ttf') format('truetype');
+        }
+
+        body {
+            background-color: white; /* Fondo blanco */
+            font-family: 'AmericanTypewriter', sans-serif; /* Fuente personalizada */
+            text-align: center;
+            padding: 50px;
+            position: relative;
+        }
+
+        h1 {
+            font-size: 36px;
+            color: #004d00; /* Verde oscuro */
+        }
+
+        .button {
+            display: inline-block;
+            padding: 15px 30px;
+            font-size: 18px;
+            background-color: #004d00; /* Verde */
+            color: white; /* Texto blanco */
+            border: 2px solid #004d00;
+            border-radius: 10px;
+            cursor: pointer;
+            text-decoration: none;
+            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+            margin: 10px;
+        }
+
+        .button:hover {
+            background-color: white;
+            color: #004d00; /* Texto verde */
+            box-shadow: 4px 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        #logo {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: 200px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        table, th, td {
+            border: 1px solid #004d00;
+        }
+
+        th, td {
+            padding: 10px;
+            text-align: center;
+        }
+
+        th {
+            background-color: #004d00;
+            color: white;
+        }
+
+        td {
+            background-color: #f2f2f2;
+            color: #004d00;
+        }
+
+        input[type="file"] {
+            margin-top: 20px;
+        }
+
+        .date {
+            font-size: 18px;
+            margin-top: 20px;
+            color: #004d00;
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- Imagen en la esquina superior izquierda -->
+    <img id="logo" src="static/3.png" alt="Logo">
+
+    <h1>CUADRANTE</h1>
+
+    <a class="button" href="portal_dc3.html">Volver al Portal DC3</a>
+
+    <!-- Formulario para cargar el archivo Excel -->
+    <input type="file" id="fileInput" accept=".xlsx, .xls" onchange="handleFile(event)" />
+    
+    <!-- Mostrar la fecha de carga -->
+    <div id="dateDisplay" class="date"></div>
+
+    <!-- Tabla donde se mostrarán los resultados -->
+    <table id="resultsTable">
+        <thead>
+            <tr>
+                <th>NOMBRE</th>
+                <th>APELLIDO 1</th>
+                <th>APELLIDO 2</th>
+                <th>DSJ</th>
+                <th>DF</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Los resultados se mostrarán aquí -->
+        </tbody>
+    </table>
+
+    <!-- Cargar la librería xlsx.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.4/xlsx.full.min.js"></script>
+
+    <script>
+        // Función para cargar el archivo y manejar los datos
+        function handleFile(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+
+                    // Suponiendo que el archivo tiene solo una hoja
+                    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+                    // Limpiar la tabla antes de mostrar los nuevos datos
+                    const tbody = document.getElementById('resultsTable').getElementsByTagName('tbody')[0];
+                    tbody.innerHTML = '';
+
+                    // Recorrer las filas del archivo Excel
+                    for (let i = 1; i < rows.length; i++) { // Comenzamos desde 1 para omitir la fila 1
+                        const row = rows[i];
+
+                        // Solo extraemos las columnas B (1), C (2), D (3), N (13) y P (15)
+                        const nombre = row[1] || '';  // Columna B
+                        const apellido1 = row[2] || '';  // Columna C
+                        const apellido2 = row[3] || '';  // Columna D
+                        const dsj = row[13] || '';  // Columna N (14 en base cero)
+                        const df = row[15] || '';  // Columna P (16 en base cero)
+
+                        // Solo mostrar filas que contengan datos en las columnas relevantes
+                        if (nombre || apellido1 || apellido2 || dsj || df) {
+                            const tr = document.createElement('tr');
+                            tr.innerHTML = `<td>${nombre}</td><td>${apellido1}</td><td>${apellido2}</td><td>${dsj}</td><td>${df}</td>`;
+                            tbody.appendChild(tr);
+                        }
+                    }
+
+                    // Guardar los datos en el localStorage para persistencia
+                    const date = new Date().toLocaleString(); // Fecha y hora actual
+                    const dataToSave = {
+                        date: date,
+                        tableData: rows.slice(1).map(row => ({
+                            nombre: row[1],
+                            apellido1: row[2],
+                            apellido2: row[3],
+                            dsj: row[13],
+                            df: row[15]
+                        }))
+                    };
+                    localStorage.setItem('cuadranteData', JSON.stringify(dataToSave));
+
+                    // Mostrar la fecha de carga
+                    document.getElementById('dateDisplay').innerText = `Cargado el: ${date}`;
+                };
+
+                reader.readAsArrayBuffer(file);
+            }
+        }
+
+        // Cargar los datos guardados si existen en el localStorage
+        function loadSavedData() {
+            const savedData = localStorage.getItem('cuadranteData');
+            if (savedData) {
+                const data = JSON.parse(savedData);
+                const tbody = document.getElementById('resultsTable').getElementsByTagName('tbody')[0];
+
+                // Mostrar la fecha de carga
+                document.getElementById('dateDisplay').innerText = `Cargado el: ${data.date}`;
+
+                // Mostrar los datos en la tabla
+                data.tableData.forEach(row => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `<td>${row.nombre}</td><td>${row.apellido1}</td><td>${row.apellido2}</td><td>${row.dsj}</td><td>${row.df}</td>`;
+                    tbody.appendChild(tr);
+                });
+            }
+        }
+
+        // Llamar a la función para cargar los datos guardados al iniciar
+        window.onload = loadSavedData;
+    </script>
+
+</body>
+</html>
